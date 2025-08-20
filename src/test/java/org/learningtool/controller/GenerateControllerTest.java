@@ -65,4 +65,5 @@ class GenerateControllerTest {
                         .content(badJson))
                 .andExpect(status().isBadRequest());
     }
+
 }
