@@ -1,45 +1,27 @@
-.gradle
-build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
+# macOS
+.DS_Store
 
-### IntelliJ IDEA ###
-.idea/modules.xml
-.idea/jarRepositories.xml
-.idea/compiler.xml
-.idea/libraries/
-*.iws
+# IDEs
+.idea/
 *.iml
 *.ipr
-out/
-!**/src/main/**/out/
-!**/src/test/**/out/
-
-### Eclipse ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-
-### VS Code ###
+*.iws
 .vscode/
+out/
+bin/
+.classpath
+.project
+.settings/
+.sts4-cache
+.springBeans
+.apt_generated
 
-### Mac OS ###
-.DS_Store# Terraform
+# Gradle
+.gradle/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Terraform
 **/.terraform/
 *.tfstate
 *.tfstate.*
@@ -52,9 +34,10 @@ override.tf
 .terraformrc
 terraform.rc
 tfplan
-# macOS
-.DS_Store
-**/.terraform/
-*.tfstate
-*.tfstate.*
-tfplan
+
+# NetBeans (if you ever use it)
+# /nbproject/private/
+# /nbbuild/
+# /dist/
+# /nbdist/
+# /.nb-gradle/
