@@ -54,3 +54,7 @@ terraform.rc
 tfplan
 # macOS
 .DS_Store
+**/.terraform/
+*.tfstate
+*.tfstate.*
+tfplan
