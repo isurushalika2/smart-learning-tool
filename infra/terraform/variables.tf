@@ -31,7 +31,7 @@ variable "allow_ssh_cidr" {
 variable "instance_type" {
   description = "EC2 instance type (Free Tier eligible: t2.micro/t3.micro depending on account)"
   type        = string
-  default     = "t2.micro"
+  default     = "t3.micro"
 }
 
 variable "key_pair_name" {
