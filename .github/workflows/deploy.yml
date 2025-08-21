@@ -26,7 +26,7 @@ on:
 
 permissions:
   contents: read
-  # If you later switch to OIDC + role assumption, also add:
+  # If you later use OIDC role assumption:
   # id-token: write
 
 concurrency:
@@ -87,7 +87,7 @@ jobs:
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_frontend == 'true') }}
         working-directory: frontend
         run: |
-          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+          (npm ci --no-audit --no-fund || npm install --no-audit --no-fund)
           npm run build
           test -d dist || { echo "frontend/dist missing"; exit 1; }
 
@@ -103,8 +103,8 @@ jobs:
   deploy-backend-ssh:
     name: Deploy backend via SSH
     needs: build
-    # Important: do not reference env.* here; job if: evaluates before job env.
-    if: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_backend == 'true' && inputs.method == 'ssh')) && secrets.SSH_PRIVATE_KEY != '' }}
+    # Only gate on event/inputs here; no secrets/env in this job-level `if:`
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_backend == 'true' && inputs.method == 'ssh') }}
     runs-on: ubuntu-latest
     steps:
       - name: Download JAR artifact
@@ -113,28 +113,50 @@ jobs:
           name: backend-jar
           path: artifacts
 
+      # Detect if SSH_PRIVATE_KEY is set and expose as an output for later steps
+      - name: Detect SSH key presence
+        id: detect_ssh
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          if [ -n "$SSH_PRIVATE_KEY" ]; then
+            echo "has_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_key=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Skipping SSH deploy::Secret SSH_PRIVATE_KEY is not set."
+          fi
+
       - name: Setup SSH key
-        if: ${{ secrets.SSH_PRIVATE_KEY != '' }}
+        if: ${{ steps.detect_ssh.outputs.has_key == 'true' }}
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Add known hosts (optional)
-        if: ${{ secrets.SSH_KNOWN_HOSTS != '' }}
+        id: detect_kh
+        env:
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
+          if [ -n "$SSH_KNOWN_HOSTS" ]; then
+            mkdir -p ~/.ssh
+            echo "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+            chmod 600 ~/.ssh/known_hosts
+            echo "has_kh=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_kh=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Ensure app directory on server
+        if: ${{ steps.detect_ssh.outputs.has_key == 'true' }}
         env:
           EC2_HOST: ${{ vars.EC2_HOST }}
           EC2_USER: ${{ vars.EC2_USER || 'ec2-user' }}
         run: |
           [ -z "$EC2_HOST" ] && echo "EC2_HOST repo variable is required for SSH deploy" && exit 1
-          ssh -o StrictHostKeyChecking=no "$EC2_USER@$EC2_HOST" 'sudo mkdir -p /opt/learning-tool && sudo chown $USER:$USER /opt/learning-tool || true'
+          ssh -o StrictHostKeyChecking=no "$EC2_USER@$EC2_HOST" "sudo mkdir -p /opt/learning-tool && sudo chown ${EC2_USER}:${EC2_USER} /opt/learning-tool || true"
 
       - name: Copy JAR to server
+        if: ${{ steps.detect_ssh.outputs.has_key == 'true' }}
         env:
           EC2_HOST: ${{ vars.EC2_HOST }}
           EC2_USER: ${{ vars.EC2_USER || 'ec2-user' }}
@@ -144,6 +166,7 @@ jobs:
           scp -o StrictHostKeyChecking=no "$JAR" "$EC2_USER@$EC2_HOST:/opt/learning-tool/app.jar"
 
       - name: Restart service
+        if: ${{ steps.detect_ssh.outputs.has_key == 'true' }}
         env:
           EC2_HOST: ${{ vars.EC2_HOST }}
           EC2_USER: ${{ vars.EC2_USER || 'ec2-user' }}
@@ -215,6 +238,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist
+          # default path is ./frontend-dist
           path: frontend-dist
 
       - name: Sync to S3
