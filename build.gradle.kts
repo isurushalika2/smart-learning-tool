@@ -8,8 +8,13 @@ group = "org.example"
 version = "0.1.0"
 
 java {
+    // Compile to Java 21 bytecode for Spring Framework compatibility
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
+    toolchain {
+        // Use a Java 24 toolchain so developers with only JDK 24 installed can build/run
+        languageVersion.set(JavaLanguageVersion.of(24))
+    }
 }
 
 repositories {
@@ -24,8 +29,9 @@ dependencies {
     // For reactive WebClient to call AI providers if desired
     implementation("org.springframework.boot:spring-boot-starter-webflux")
 
-    // MongoDB persistence (activates when spring.data.mongodb.uri configured)
-    implementation("org.springframework.boot:spring-boot-starter-data-mongodb")
+
+    // AWS SDK v2 for DynamoDB (used when dynamodb.enabled=true)
+    implementation("software.amazon.awssdk:dynamodb:2.25.61")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
@@ -34,6 +40,7 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+// Compile with --release 21 to avoid Java 24 classfile (major 68) incompatibilities with Spring's ASM
 tasks.withType<JavaCompile> {
     options.release.set(21)
 }

@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import axios from 'axios'
 
+const API = axios.create({ baseURL: import.meta.env.VITE_API_BASE || '' })
+
 const types = [
   { value: 'SHORT_NOTES', label: 'Short Notes' },
   { value: 'CHEAT_SHEET', label: 'Cheat Sheet' },
@@ -26,7 +28,7 @@ export default function App() {
     setError('')
     setResult(null)
     try {
-      const res = await axios.post('/api/generate', { type, topic, level, language })
+      const res = await API.post('/api/generate', { type, topic, level, language })
       setResult(res.data)
     } catch (err) {
       setError(err.response?.data?.message || err.message)

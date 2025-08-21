@@ -3,10 +3,10 @@ set -euxo pipefail
 # Update system
 sudo dnf -y update
 
-# Install Amazon Corretto 21 (widely available; Spring Boot 3.3 supports 21). The app can be built with Java 24 but runs on 21 if compiled accordingly.
+# Install Amazon Corretto 24 (Java 24)
 sudo rpm --import https://yum.corretto.aws/corretto.key || true
 sudo curl -L -o /etc/yum.repos.d/corretto.repo https://yum.corretto.aws/corretto.repo
-sudo dnf -y install java-21-amazon-corretto-headless git
+sudo dnf -y install java-24-amazon-corretto-headless git
 
 # Create app directory
 sudo mkdir -p /opt/learning-tool

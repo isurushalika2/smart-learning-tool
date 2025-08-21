@@ -12,3 +12,11 @@ openai:
     key: ${OPENAI_API_KEY:}
     base: ${OPENAI_API_BASE:https://api.openai.com}
 
+
+# DynamoDB settings. DynamoDB is the only supported persistence and is enabled by default.
+# Configure table/region via env vars. The app will run even without credentials (errors are swallowed).
+dynamodb:
+  enabled: ${DYNAMODB_ENABLED:true}
+  table: ${DYNAMODB_TABLE_NAME:learningtool-generation-history}
+  region: ${DYNAMODB_REGION:}
+

@@ -1,8 +1,10 @@
 package org.learningtool.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.learningtool.repository.DynamoDbGenerationHistoryRepository;
 import org.learningtool.repository.GenerationHistoryRepository;
-import org.learningtool.repository.InMemoryGenerationHistoryRepository;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -17,21 +19,25 @@ public class AppConfig {
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        // Allow requests from local Vite dev server
-        config.setAllowedOrigins(List.of("http://localhost:5173"));
+        // Allow requests from any origin (dev/prod). No credentials are used by this app.
+        config.setAllowedOriginPatterns(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
+        config.setAllowedHeaders(List.of("*") );
+        config.setAllowCredentials(false);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return new CorsFilter(source);
     }
 
-    // Fallback bean: ensure a GenerationHistoryRepository exists when Mongo is not configured
+    // DynamoDB-backed repository (enabled when dynamodb.enabled=true)
     @Bean
-    @ConditionalOnMissingBean(GenerationHistoryRepository.class)
-    public GenerationHistoryRepository generationHistoryRepository() {
-        return new InMemoryGenerationHistoryRepository();
+    @ConditionalOnProperty(name = "dynamodb.enabled", havingValue = "true")
+    public GenerationHistoryRepository dynamoGenerationHistoryRepository(
+            ObjectMapper mapper,
+            @Value("${dynamodb.table:learningtool-generation-history}") String table,
+            @Value("${dynamodb.region:}") String region
+    ) {
+        return new DynamoDbGenerationHistoryRepository(mapper, table, region);
     }
 }

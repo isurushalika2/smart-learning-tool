@@ -1,7 +1,8 @@
+/*
+ Mongo support removed. This interface is intentionally left empty to avoid compile errors
+ when the file still exists in some local working copies.
+*/
 package org.learningtool.repository;
 
-import org.learningtool.model.GenerationRecord;
-import org.springframework.data.mongodb.repository.MongoRepository;
-
-public interface GenerationRecordMongoRepo extends MongoRepository<GenerationRecord, String> {
+public interface GenerationRecordMongoRepo {
 }

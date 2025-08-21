@@ -20,7 +20,7 @@ flowchart LR
 
 ## Why these technologies
 - Spring Boot: Mature ecosystem, rapid API development, actuator for ops, validation, WebFlux for calling external APIs.
-- Java (21 default): LTS, best support with Spring Boot 3.3; Java 24 can be tested when supported.
+- Java 24 runtime (recommended), compiled to Java 21 bytecode for framework compatibility (runs on Java 21+). Verified with Spring Boot 3.3.
 - Gradle: Fast, flexible build system with kotlin DSL.
 - React + Vite: Modern, fast dev server and build pipeline, good DX.
 
@@ -36,7 +36,7 @@ flowchart LR
 - Add new content type: extend GenerateRequest.ContentType and adjust Provider implementations.
 - Add providers: create another ProviderX implementing ContentProvider and update ProviderFactory routing rules.
 - Add authentication/rate limiting: Spring Security and filters; API keys per user.
-- Persistence: store generated artifacts in a DB. The project includes optional MongoDB/DocumentDB integration (enable with AWS_DOCDB_URI or MONGODB_URI); otherwise it uses an in-memory store. You can swap to RDS (JPA) as needed.
+- Persistence: stores generation history in AWS DynamoDB (default and only supported). The app can be extended to other stores (e.g., RDS) if needed.
 
 ## Deployment
 - Backend: Build a fat jar `./gradlew bootJar` and run with Java 24. Containerize with a minimal base (e.g., eclipse-temurin:24-jre-alpine if available).
