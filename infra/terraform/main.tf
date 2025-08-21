@@ -96,8 +96,9 @@ resource "aws_iam_role_policy_attachment" "ssm_core" {
 }
 
 resource "aws_iam_instance_profile" "ssm_profile" {
-  name = "${var.project_name}-ec2-ssm-profile"
-  role = aws_iam_role.ssm_role.name
+  # Use a prefix to avoid conflicts if an instance profile with the fixed name already exists
+  name_prefix = "${var.project_name}-ec2-ssm-profile-"
+  role        = aws_iam_role.ssm_role.name
 }
 
 # Find latest Amazon Linux 2023 AMI
