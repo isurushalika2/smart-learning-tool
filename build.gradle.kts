@@ -8,8 +8,8 @@ group = "org.example"
 version = "0.1.0"
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_24
-    targetCompatibility = JavaVersion.VERSION_24
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 repositories {
@@ -35,7 +35,7 @@ tasks.withType<Test> {
 }
 
 tasks.withType<JavaCompile> {
-    options.release.set(24)
+    options.release.set(21)
 }
 
 springBoot {

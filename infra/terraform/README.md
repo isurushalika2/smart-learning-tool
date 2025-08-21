@@ -45,3 +45,29 @@ This setup is designed for Free Tier usage:
 - VPC/IGW/Route tables: no direct hourly charges.
 - IAM/SSM: IAM is free; SSM Session Manager typically free for basic usage.
 Always monitor your costs in the AWS Billing console.
+
+## GitHub Actions Terraform Workflows
+Two workflows are provided:
+- .github/workflows/terraform-plan.yml: runs on pull requests touching infra/terraform; performs fmt, init, validate, and plan; uploads plan as an artifact.
+- .github/workflows/terraform-apply.yml: runs on push to master and can be triggered manually; performs init, plan (for visibility), and apply.
+
+### Required GitHub configuration
+1) Set organization/repo Variables and Secrets:
+- Repository Variable AWS_REGION (optional, defaults to us-east-1).
+- Repository Secret AWS_ACCESS_KEY_ID with an IAM user's access key ID.
+- Repository Secret AWS_SECRET_ACCESS_KEY with the corresponding secret access key.
+- Optional Repository Secret AWS_SESSION_TOKEN if you use temporary session credentials.
+
+2) Protect the "production" environment (recommended):
+- Add required reviewers or manual approvals so applies are gated.
+
+### Required AWS IAM setup (Access Keys)
+Create or choose IAM credentials that have permissions to manage your resources and the Terraform backend:
+- Grant access to your S3 backend bucket and DynamoDB lock table (see backend.tf).
+- Grant Create/Update/Delete for the AWS resources used in this module (EC2, VPC, IGW, Route Tables, Subnets, Security Groups, IAM roles/instance profiles, S3, etc.). Use least-privilege, ideally scoped by resource ARNs and/or project tags.
+
+Security note: Access keys are long‑lived. Rotate them regularly and restrict their permissions. Consider migrating to OIDC and short‑lived credentials when possible.
+
+### Running locally vs CI
+- Local: ensure your credentials can access the same backend bucket/table.
+- CI: the workflows read AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY (and optional AWS_SESSION_TOKEN) from repository secrets/variables and export them for Terraform/AWS CLI.
