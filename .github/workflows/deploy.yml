@@ -174,21 +174,19 @@ jobs:
           INSTANCE_ID: ${{ vars.INSTANCE_ID }}
         run: |
           [ -z "$INSTANCE_ID" ] && echo "INSTANCE_ID repo variable is required for ssm-s3 deploy" && exit 1
-          CMD=$(cat <<EOF
-  set -euxo pipefail
-  sudo mkdir -p /opt/learning-tool
-  sudo chown ec2-user:ec2-user /opt/learning-tool
-  aws s3 cp s3://${{ vars.ARTIFACTS_BUCKET }}/releases/app-${{ github.sha }}.jar /opt/learning-tool/app.jar --region ${{ env.AWS_REGION }}
-  sudo systemctl daemon-reload || true
-  sudo systemctl restart learning-tool || (nohup java -jar /opt/learning-tool/app.jar >/var/log/learning-tool.out 2>&1 &)
-  EOF
-  )
-  aws ssm send-command \
-  --instance-ids "$INSTANCE_ID" \
-  --document-name "AWS-RunShellScript" \
-  --comment "Deploy Learning Tool ${{ github.sha }}" \
-  --parameters "{\"commands\":[\"$CMD\"]}" \
-  --region "${{ env.AWS_REGION }}"
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy Learning Tool ${{ github.sha }}" \
+            --parameters commands='[
+              "set -euxo pipefail",
+              "sudo mkdir -p /opt/learning-tool",
+              "sudo chown ec2-user:ec2-user /opt/learning-tool",
+              "aws s3 cp s3://${{ vars.ARTIFACTS_BUCKET }}/releases/app-${{ github.sha }}.jar /opt/learning-tool/app.jar --region ${{ env.AWS_REGION }}",
+              "sudo systemctl daemon-reload || true",
+              "sudo systemctl restart learning-tool || (nohup java -jar /opt/learning-tool/app.jar >/var/log/learning-tool.out 2>&1 &)"
+            ]' \
+            --region "${{ env.AWS_REGION }}"
 
 deploy-frontend:
   name: Deploy frontend to S3
