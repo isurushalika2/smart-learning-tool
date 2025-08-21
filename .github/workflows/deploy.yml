@@ -103,7 +103,7 @@ jobs:
   deploy-backend-ssh:
     name: Deploy backend via SSH
     needs: build
-    if: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_backend == 'true' && inputs.method == 'ssh')) && env.SSH_PRIVATE_KEY != '' }}
+    if: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_backend == 'true' && inputs.method == 'ssh')) && env.SSH_PRIVATE_KEY != null }}
     runs-on: ubuntu-latest
     env:
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
