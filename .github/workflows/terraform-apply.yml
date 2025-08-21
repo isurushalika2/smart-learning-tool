@@ -1,17 +1,20 @@
 name: Terraform Apply
 
 on:
-  push:
-    branches: [ "master" ]
-    paths:
-      - 'infra/terraform/**'
-      - '.github/workflows/terraform-*.yml'
   workflow_dispatch:
     inputs:
       confirm:
         description: 'Type APPLY to confirm applying Terraform'
         required: true
         default: 'DRYRUN'
+      directory:
+        description: 'Terraform working directory'
+        default: 'infra/terraform'
+        required: true
+      apply_args:
+        description: 'Extra arguments for terraform apply'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -34,7 +37,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: infra/terraform
+        working-directory: ${{ github.event.inputs.directory || 'infra/terraform' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -61,6 +64,11 @@ jobs:
           TF_VAR_aws_region: ${{ env.AWS_REGION }}
 
       - name: Terraform apply
-        run: terraform apply -input=false -auto-approve tfplan
+        run: |
+          if [ "${{ github.event.inputs.apply_args }}" != "" ]; then
+            terraform apply -input=false -auto-approve ${{ github.event.inputs.apply_args }} tfplan
+          else
+            terraform apply -input=false -auto-approve tfplan
+          fi
         env:
           TF_VAR_aws_region: ${{ env.AWS_REGION }}
