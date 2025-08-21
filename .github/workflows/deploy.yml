@@ -46,11 +46,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 21
+      - name: Set up JDK 24
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '24'
           cache: gradle
 
       - name: Make Gradle wrapper executable
@@ -81,13 +81,13 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: frontend/package.json
 
       - name: Build frontend
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_frontend == 'true') }}
         working-directory: frontend
         run: |
-          npm ci --no-audit --no-fund
+          npm install --no-audit --no-fund
           npm run build
           test -d dist || { echo "frontend/dist missing"; exit 1; }
 
