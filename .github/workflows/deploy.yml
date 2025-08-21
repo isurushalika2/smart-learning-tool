@@ -118,10 +118,12 @@ jobs:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Add known hosts (optional)
-        if: ${{ secrets.SSH_KNOWN_HOSTS != '' }}
+        env:
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        if: ${{ env.SSH_KNOWN_HOSTS != '' }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          echo "${{ env.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
       - name: Copy JAR to server
@@ -188,28 +190,28 @@ jobs:
             ]' \
             --region "${{ env.AWS_REGION }}"
 
-deploy-frontend:
-  name: Deploy frontend to S3
-  needs: build
-  if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_frontend == 'true') }}
-  runs-on: ubuntu-latest
-  steps:
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
+  deploy-frontend:
+    name: Deploy frontend to S3
+    needs: build
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_frontend == 'true') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-    - name: Download frontend build
-      uses: actions/download-artifact@v4
-      with:
-        name: frontend-dist
-        path: frontend-dist
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend-dist
 
-    - name: Sync to S3
-      env:
-        FRONTEND_BUCKET: ${{ vars.FRONTEND_BUCKET }}
-      run: |
-        [ -z "$FRONTEND_BUCKET" ] && echo "FRONTEND_BUCKET repo variable is not set; skipping" && exit 0
-        aws s3 sync frontend-dist/ s3://$FRONTEND_BUCKET/ --delete --region "${{ env.AWS_REGION }}"
+      - name: Sync to S3
+        env:
+          FRONTEND_BUCKET: ${{ vars.FRONTEND_BUCKET }}
+        run: |
+          [ -z "$FRONTEND_BUCKET" ] && echo "FRONTEND_BUCKET repo variable is not set; skipping" && exit 0
+          aws s3 sync frontend-dist/ s3://$FRONTEND_BUCKET/ --delete --region "${{ env.AWS_REGION }}"
