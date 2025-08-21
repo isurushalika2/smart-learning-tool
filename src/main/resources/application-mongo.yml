@@ -1,0 +1,23 @@
+# Mongo-enabled profile. Activate with: SPRING_PROFILES_ACTIVE=mongo
+# This profile re-enables Spring Boot's Mongo auto-configuration so you can use
+# AWS DocumentDB or a standard MongoDB by providing a proper connection string.
+#
+# IMPORTANT:
+# - For AWS DocumentDB, set the full connection string in AWS_DOCDB_URI, e.g.:
+#   mongodb://<user>:<pass>@<docdb-cluster-endpoint>:27017/learningtool?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false
+#   Optionally add sslInvalidHostNameAllowed=true if your environment requires it (not recommended for production).
+# - Alternatively, you can set MONGODB_URI for a standard MongoDB.
+
+spring:
+  autoconfigure:
+    # Override default excludes (from application.yml) to re-enable Mongo auto-config under this profile
+    exclude: []
+  data:
+    mongodb:
+      # Prefer AWS DocumentDB env var, fallback to generic Mongo env var
+      uri: ${AWS_DOCDB_URI:${MONGODB_URI:}}
+
+management:
+  health:
+    mongo:
+      enabled: true

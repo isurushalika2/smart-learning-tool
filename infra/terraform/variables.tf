@@ -51,3 +51,16 @@ variable "subnet_az" {
   type        = string
   default     = "us-east-1a"
 }
+
+# Free Tier DB option (DynamoDB)
+variable "create_dynamodb" {
+  description = "Create a DynamoDB table for storing generation history (Free Tier eligible)"
+  type        = bool
+  default     = true
+}
+
+variable "dynamodb_table_name" {
+  description = "Name of the DynamoDB table to create when create_dynamodb is true"
+  type        = string
+  default     = "learningtool-generation-history"
+}

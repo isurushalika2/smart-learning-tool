@@ -12,9 +12,3 @@ openai:
     key: ${OPENAI_API_KEY:}
     base: ${OPENAI_API_BASE:https://api.openai.com}
 
-# Configure this to enable MongoDB/DocumentDB persistence. If not set, the app uses in-memory storage.
-spring:
-  data:
-    mongodb:
-      # Prefer AWS DocumentDB URI if provided, otherwise use MongoDB URI
-      uri: ${AWS_DOCDB_URI:${MONGODB_URI:}}

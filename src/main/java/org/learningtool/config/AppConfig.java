@@ -1,5 +1,8 @@
 package org.learningtool.config;
 
+import org.learningtool.repository.GenerationHistoryRepository;
+import org.learningtool.repository.InMemoryGenerationHistoryRepository;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -23,5 +26,12 @@ public class AppConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return new CorsFilter(source);
+    }
+
+    // Fallback bean: ensure a GenerationHistoryRepository exists when Mongo is not configured
+    @Bean
+    @ConditionalOnMissingBean(GenerationHistoryRepository.class)
+    public GenerationHistoryRepository generationHistoryRepository() {
+        return new InMemoryGenerationHistoryRepository();
     }
 }
