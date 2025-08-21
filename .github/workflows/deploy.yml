@@ -26,7 +26,7 @@ on:
 
 permissions:
   contents: read
-  # If you later switch to OIDC + role:
+  # If you later switch to OIDC + role assumption, also add:
   # id-token: write
 
 concurrency:
@@ -34,7 +34,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION != '' && vars.AWS_REGION || 'us-east-1' }}
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
 
 jobs:
   build:
@@ -65,7 +65,7 @@ jobs:
           if [ -z "$JAR" ]; then
             echo "No JAR produced in build/libs"; exit 1
           fi
-          echo "jar_path=$JAR" >> $GITHUB_OUTPUT
+          echo "jar_path=$JAR" >> "$GITHUB_OUTPUT"
 
       - name: Upload backend JAR artifact
         if: ${{ steps.backend.outputs.jar_path != '' }}
@@ -81,13 +81,13 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: frontend/package.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Build frontend
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_frontend == 'true') }}
         working-directory: frontend
         run: |
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
           npm run build
           test -d dist || { echo "frontend/dist missing"; exit 1; }
 
@@ -103,10 +103,9 @@ jobs:
   deploy-backend-ssh:
     name: Deploy backend via SSH
     needs: build
-    if: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_backend == 'true' && inputs.method == 'ssh')) && env.SSH_PRIVATE_KEY != null }}
+    # Important: do not reference env.* here; job if: evaluates before job env.
+    if: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_backend == 'true' && inputs.method == 'ssh')) && secrets.SSH_PRIVATE_KEY != '' }}
     runs-on: ubuntu-latest
-    env:
-      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
     steps:
       - name: Download JAR artifact
         uses: actions/download-artifact@v4
@@ -115,24 +114,30 @@ jobs:
           path: artifacts
 
       - name: Setup SSH key
-        if: ${{ env.SSH_PRIVATE_KEY != '' }}
+        if: ${{ secrets.SSH_PRIVATE_KEY != '' }}
         uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-private-key: ${{ env.SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Add known hosts (optional)
-        env:
-          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-        if: ${{ env.SSH_KNOWN_HOSTS != '' }}
+        if: ${{ secrets.SSH_KNOWN_HOSTS != '' }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ env.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
+
+      - name: Ensure app directory on server
+        env:
+          EC2_HOST: ${{ vars.EC2_HOST }}
+          EC2_USER: ${{ vars.EC2_USER || 'ec2-user' }}
+        run: |
+          [ -z "$EC2_HOST" ] && echo "EC2_HOST repo variable is required for SSH deploy" && exit 1
+          ssh -o StrictHostKeyChecking=no "$EC2_USER@$EC2_HOST" 'sudo mkdir -p /opt/learning-tool && sudo chown $USER:$USER /opt/learning-tool || true'
 
       - name: Copy JAR to server
         env:
           EC2_HOST: ${{ vars.EC2_HOST }}
-          EC2_USER: ${{ vars.EC2_USER != '' && vars.EC2_USER || 'ec2-user' }}
+          EC2_USER: ${{ vars.EC2_USER || 'ec2-user' }}
         run: |
           JAR=$(ls -1 artifacts/*.jar | head -n1)
           [ -z "$EC2_HOST" ] && echo "EC2_HOST repo variable is required for SSH deploy" && exit 1
@@ -141,7 +146,7 @@ jobs:
       - name: Restart service
         env:
           EC2_HOST: ${{ vars.EC2_HOST }}
-          EC2_USER: ${{ vars.EC2_USER != '' && vars.EC2_USER || 'ec2-user' }}
+          EC2_USER: ${{ vars.EC2_USER || 'ec2-user' }}
         run: |
           ssh -o StrictHostKeyChecking=no "$EC2_USER@$EC2_HOST" '
             sudo systemctl daemon-reload || true
