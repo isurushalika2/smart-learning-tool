@@ -24,10 +24,11 @@ terraform apply -auto-approve
 
 Variables (see variables.tf):
 - aws_region (default: us-east-1)
-- instance_type (default: t2.micro)
+- instance_type (default: t3.micro)
 - allow_ssh_cidr (default: 0.0.0.0/0) — restrict to your IP for production
 - key_pair_name (default: "") — set to an existing EC2 key pair name to enable SSH key login
 - create_s3_website (default: true)
+- subnet_az (default: us-east-1a) — AZ for the public subnet; ensure your chosen instance_type is supported in this AZ.
 
 Outputs:
 - backend_instance_public_ip / public_dns

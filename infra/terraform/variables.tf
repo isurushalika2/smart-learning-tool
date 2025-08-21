@@ -45,3 +45,9 @@ variable "create_s3_website" {
   type        = bool
   default     = true
 }
+
+variable "subnet_az" {
+  description = "Availability Zone for the public subnet (must be in the selected aws_region and support the chosen instance_type)"
+  type        = string
+  default     = "us-east-1a"
+}

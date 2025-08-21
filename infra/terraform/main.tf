@@ -21,6 +21,7 @@ resource "aws_internet_gateway" "igw" {
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = var.public_subnet_cidr
+  availability_zone       = var.subnet_az
   map_public_ip_on_launch = true
   tags                    = merge(local.tags, { Name = "${var.project_name}-public-subnet" })
 }
