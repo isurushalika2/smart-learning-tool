@@ -76,19 +76,59 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
-      - name: Set up Node.js 20
+      # ---------- FRONTEND: lockfile detection + cached setup ----------
+      - name: Detect frontend lockfile
+        id: frontlock
+        run: |
+          set -e
+          if [ -f frontend/package-lock.json ]; then
+            echo "manager=npm"   >> "$GITHUB_OUTPUT"
+            echo "lock=frontend/package-lock.json" >> "$GITHUB_OUTPUT"
+          elif [ -f frontend/pnpm-lock.yaml ]; then
+            echo "manager=pnpm" >> "$GITHUB_OUTPUT"
+            echo "lock=frontend/pnpm-lock.yaml" >> "$GITHUB_OUTPUT"
+          elif [ -f frontend/yarn.lock ]; then
+            echo "manager=yarn" >> "$GITHUB_OUTPUT"
+            echo "lock=frontend/yarn.lock" >> "$GITHUB_OUTPUT"
+          else
+            echo "manager=none" >> "$GITHUB_OUTPUT"
+            echo "lock="        >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node.js 20 (cached)
+        if: ${{ steps.frontlock.outputs.manager != 'none' }}
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          cache: ${{ steps.frontlock.outputs.manager }} # npm | pnpm | yarn
+          cache-dependency-path: ${{ steps.frontlock.outputs.lock }}
+
+      - name: Set up Node.js 20 (no cache)
+        if: ${{ steps.frontlock.outputs.manager == 'none' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
       - name: Build frontend
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_frontend == 'true') }}
         working-directory: frontend
         run: |
-          (npm ci --no-audit --no-fund || npm install --no-audit --no-fund)
-          npm run build
+          set -e
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+            npm run build
+          elif [ -f pnpm-lock.yaml ]; then
+            corepack enable
+            pnpm install --frozen-lockfile || pnpm install
+            pnpm build || npm run build
+          elif [ -f yarn.lock ]; then
+            corepack enable
+            yarn install --frozen-lockfile || yarn install
+            yarn build || npm run build
+          else
+            npm install --no-audit --no-fund
+            npm run build
+          fi
           test -d dist || { echo "frontend/dist missing"; exit 1; }
 
       - name: Upload frontend dist artifact
@@ -103,7 +143,7 @@ jobs:
   deploy-backend-ssh:
     name: Deploy backend via SSH
     needs: build
-    # Only gate on event/inputs here; no secrets/env in this job-level `if:`
+    # Only gate on event/inputs here (don't reference secrets/env at job-level)
     if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_backend == 'true' && inputs.method == 'ssh') }}
     runs-on: ubuntu-latest
     steps:
@@ -113,7 +153,6 @@ jobs:
           name: backend-jar
           path: artifacts
 
-      # Detect if SSH_PRIVATE_KEY is set and expose as an output for later steps
       - name: Detect SSH key presence
         id: detect_ssh
         env:
@@ -133,7 +172,6 @@ jobs:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Add known hosts (optional)
-        id: detect_kh
         env:
           SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
@@ -141,9 +179,6 @@ jobs:
             mkdir -p ~/.ssh
             echo "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
             chmod 600 ~/.ssh/known_hosts
-            echo "has_kh=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_kh=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Ensure app directory on server
@@ -238,7 +273,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist
-          # default path is ./frontend-dist
           path: frontend-dist
 
       - name: Sync to S3
