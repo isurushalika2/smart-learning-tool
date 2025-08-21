@@ -26,13 +26,15 @@ on:
 
 permissions:
   contents: read
+  # If you later switch to OIDC + role:
+  # id-token: write
 
 concurrency:
   group: deploy-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  AWS_REGION: ${{ vars.AWS_REGION != '' && vars.AWS_REGION || 'us-east-1' }}
 
 jobs:
   build:
@@ -60,27 +62,43 @@ jobs:
         run: |
           ./gradlew --no-daemon clean bootJar
           JAR=$(ls -1 build/libs/*.jar | head -n1)
+          if [ -z "$JAR" ]; then
+            echo "No JAR produced in build/libs"; exit 1
+          fi
           echo "jar_path=$JAR" >> $GITHUB_OUTPUT
+
+      - name: Upload backend JAR artifact
+        if: ${{ steps.backend.outputs.jar_path != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: ${{ steps.backend.outputs.jar_path }}
+          if-no-files-found: error
+          retention-days: 3
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Build frontend
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_frontend == 'true') }}
         working-directory: frontend
         run: |
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund
           npm run build
+          test -d dist || { echo "frontend/dist missing"; exit 1; }
 
-      - name: Upload built JAR as artifact
-        if: ${{ steps.backend.outputs.jar_path != '' }}
+      - name: Upload frontend dist artifact
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_frontend == 'true') }}
         uses: actions/upload-artifact@v4
         with:
-          name: backend-jar
-          path: ${{ steps.backend.outputs.jar_path }}
+          name: frontend-dist
+          path: frontend/dist
+          if-no-files-found: error
+          retention-days: 3
 
   deploy-backend-ssh:
     name: Deploy backend via SSH
@@ -109,7 +127,7 @@ jobs:
       - name: Copy JAR to server
         env:
           EC2_HOST: ${{ vars.EC2_HOST }}
-          EC2_USER: ${{ vars.EC2_USER || 'ec2-user' }}
+          EC2_USER: ${{ vars.EC2_USER != '' && vars.EC2_USER || 'ec2-user' }}
         run: |
           JAR=$(ls -1 artifacts/*.jar | head -n1)
           [ -z "$EC2_HOST" ] && echo "EC2_HOST repo variable is required for SSH deploy" && exit 1
@@ -118,19 +136,26 @@ jobs:
       - name: Restart service
         env:
           EC2_HOST: ${{ vars.EC2_HOST }}
-          EC2_USER: ${{ vars.EC2_USER || 'ec2-user' }}
+          EC2_USER: ${{ vars.EC2_USER != '' && vars.EC2_USER || 'ec2-user' }}
         run: |
-          ssh -o StrictHostKeyChecking=no "$EC2_USER@$EC2_HOST" 'sudo systemctl daemon-reload || true; sudo systemctl restart learning-tool || (nohup java -jar /opt/learning-tool/app.jar >/var/log/learning-tool.out 2>&1 &)' 
+          ssh -o StrictHostKeyChecking=no "$EC2_USER@$EC2_HOST" '
+            sudo systemctl daemon-reload || true
+            sudo systemctl restart learning-tool || (nohup java -jar /opt/learning-tool/app.jar >/var/log/learning-tool.out 2>&1 &)
+          '
 
   deploy-backend-ssm:
     name: Deploy backend via SSM + S3
     needs: build
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_backend == 'true' && inputs.method == 'ssm-s3' }}
     runs-on: ubuntu-latest
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
       - name: Download JAR artifact
         uses: actions/download-artifact@v4
         with:
@@ -147,50 +172,46 @@ jobs:
       - name: SSM SendCommand to deploy
         env:
           INSTANCE_ID: ${{ vars.INSTANCE_ID }}
-          ARTIFACTS_BUCKET: ${{ vars.ARTIFACTS_BUCKET }}
         run: |
           [ -z "$INSTANCE_ID" ] && echo "INSTANCE_ID repo variable is required for ssm-s3 deploy" && exit 1
-          CMD=$(cat <<'EOS'
-          set -euxo pipefail
-          sudo mkdir -p /opt/learning-tool
-          sudo chown ec2-user:ec2-user /opt/learning-tool
-          aws s3 cp s3://${ARTIFACTS_BUCKET}/releases/app-${GITHUB_SHA}.jar /opt/learning-tool/app.jar --region ${AWS_REGION}
-          sudo systemctl daemon-reload || true
-          sudo systemctl restart learning-tool || (nohup java -jar /opt/learning-tool/app.jar >/var/log/learning-tool.out 2>&1 &)
-          EOS
-          )
-          aws ssm send-command \
-            --instance-ids "$INSTANCE_ID" \
-            --document-name "AWS-RunShellScript" \
-            --comment "Deploy Learning Tool $GITHUB_SHA" \
-            --parameters commands="$CMD" \
-            --region "${{ env.AWS_REGION }}"
+          CMD=$(cat <<EOF
+  set -euxo pipefail
+  sudo mkdir -p /opt/learning-tool
+  sudo chown ec2-user:ec2-user /opt/learning-tool
+  aws s3 cp s3://${{ vars.ARTIFACTS_BUCKET }}/releases/app-${{ github.sha }}.jar /opt/learning-tool/app.jar --region ${{ env.AWS_REGION }}
+  sudo systemctl daemon-reload || true
+  sudo systemctl restart learning-tool || (nohup java -jar /opt/learning-tool/app.jar >/var/log/learning-tool.out 2>&1 &)
+  EOF
+  )
+  aws ssm send-command \
+  --instance-ids "$INSTANCE_ID" \
+  --document-name "AWS-RunShellScript" \
+  --comment "Deploy Learning Tool ${{ github.sha }}" \
+  --parameters "{\"commands\":[\"$CMD\"]}" \
+  --region "${{ env.AWS_REGION }}"
 
-  deploy-frontend:
-    name: Deploy frontend to S3
-    needs: build
-    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_frontend == 'true') }}
-    runs-on: ubuntu-latest
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Download frontend build
-        uses: actions/download-artifact@v4
-        if: false # frontend build files are still in the workspace of build job; not needed here
-        with:
-          name: frontend-dist
-          path: frontend/dist
-      - name: Sync to S3
-        env:
-          FRONTEND_BUCKET: ${{ vars.FRONTEND_BUCKET }}
-        run: |
-          [ -z "$FRONTEND_BUCKET" ] && echo "FRONTEND_BUCKET repo variable is not set; skipping" && exit 0
-          # Rebuild to get dist in this job's workspace
-          sudo apt-get update && sudo apt-get install -y nodejs npm >/dev/null 2>&1 || true
-          cd frontend
-          npm install --no-audit --no-fund
-          npm run build
-          aws s3 sync dist/ s3://$FRONTEND_BUCKET/ --delete --region "${{ env.AWS_REGION }}"
+deploy-frontend:
+  name: Deploy frontend to S3
+  needs: build
+  if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_frontend == 'true') }}
+  runs-on: ubuntu-latest
+  steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Download frontend build
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-dist
+        path: frontend-dist
+
+    - name: Sync to S3
+      env:
+        FRONTEND_BUCKET: ${{ vars.FRONTEND_BUCKET }}
+      run: |
+        [ -z "$FRONTEND_BUCKET" ] && echo "FRONTEND_BUCKET repo variable is not set; skipping" && exit 0
+        aws s3 sync frontend-dist/ s3://$FRONTEND_BUCKET/ --delete --region "${{ env.AWS_REGION }}"
