@@ -1,0 +1,17 @@
+[Unit]
+Description=Learning Tool Spring Boot Service
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/opt/learning-tool
+# Load environment variables if present
+EnvironmentFile=/etc/learning-tool.env
+ExecStart=/usr/bin/java -jar /opt/learning-tool/app.jar
+Restart=always
+RestartSec=5
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target
