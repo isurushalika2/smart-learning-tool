@@ -1,0 +1,75 @@
+### LearningTool sample HTTP requests
+### Use this file with IntelliJ HTTP Client or VS Code REST Client extension.
+### Replace the host if your server runs on a different port or base URL.
+
+@host = http://localhost:8080
+
+### 1) Insert a sample record (no request body)
+POST {{host}}/api/history/sample
+Accept: application/json
+
+### 2) Insert a custom history record (GenerateResponse schema)
+### This creates a sample item directly in DynamoDB (when enabled)
+POST {{host}}/api/history
+Content-Type: application/json
+Accept: application/json
+
+{
+  "type": "SAMPLE",
+  "topic": "DynamoDB connectivity test",
+  "summary": "This is a custom sample record",
+  "items": ["bullet-1", "bullet-2", "bullet-3"],
+  "payload": {
+    "source": "http-file",
+    "tags": ["sample", "history"],
+    "difficulty": "easy"
+  }
+}
+
+### 3) Insert another custom history record with different content
+POST {{host}}/api/history
+Content-Type: application/json
+Accept: application/json
+
+{
+  "type": "SHORT_NOTES",
+  "topic": "Java Generics",
+  "summary": "Key points about Java Generics",
+  "items": [
+    "Type erasure",
+    "Bounded wildcards",
+    "PECS principle"
+  ],
+  "payload": {
+    "notes": "Use <? extends T> for covariance; <? super T> for contravariance"
+  }
+}
+
+### 4) Generate content (GenerateRequest schema)
+### The response is also saved to history via the service
+POST {{host}}/api/generate
+Content-Type: application/json
+Accept: application/json
+
+{
+  "type": "SHORT_NOTES",
+  "topic": "Kubernetes Basics",
+  "level": "beginner",
+  "language": "en"
+}
+
+### 5) Another generate example
+POST {{host}}/api/generate
+Content-Type: application/json
+Accept: application/json
+
+{
+  "type": "CHEAT_SHEET",
+  "topic": "React Hooks",
+  "level": "intermediate",
+  "language": "en"
+}
+
+### 6) Fetch all history items (scans DynamoDB when enabled)
+GET {{host}}/api/history
+Accept: application/json

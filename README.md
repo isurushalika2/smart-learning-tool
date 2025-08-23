@@ -22,6 +22,8 @@ Important: The project compiles to Java 21 bytecode for Spring compatibility and
   - ./gradlew bootRun
 - API will be at http://localhost:8080
 
+👉 For a step-by-step guide on generating content with AI (Swagger UI, frontend, and cURL), see docs/GENERATE_WITH_AI.md
+
 2) Frontend
 - Prerequisites: Node 18+
 - Development (proxy to backend):
@@ -30,6 +32,11 @@ Important: The project compiles to Java 21 bytecode for Spring compatibility and
   - npm run dev
   - Open http://localhost:5173
   - Vite dev server proxies /api to http://localhost:8080 (see frontend/vite.config.js)
+- UI Overview:
+  - Tabs in header: Generate, History, Admin
+  - Generate: form to POST /api/generate and view pretty and raw JSON results
+  - History: list of items from /api/history
+  - Admin: buttons/forms to replicate Swagger actions (insert sample/custom history, trigger generate, fetch history)
 - Production build:
   - npm run build
   - Serve dist/ from any host, and set the backend URL via environment:
@@ -85,6 +92,14 @@ Configure via environment variables:
 Notes:
 - If credentials are missing or the table is absent, the app continues to serve requests; save() failures are swallowed to avoid breaking the flow.
 - You no longer need MongoDB or AWS DocumentDB for this project.
+
+## Deployment environment variables (AWS / GitHub Actions)
+For production deployments, place OPENAI_API_KEY, OPENAI_API_BASE, DYNAMODB_ENABLED, DYNAMODB_TABLE_NAME, and DYNAMODB_REGION as environment variables where the backend process runs. Recommended approaches:
+- GitHub Actions deploy.yml → store values in GitHub Secrets, then write them to /etc/learning-tool.env on the EC2 instance and reference it via a systemd service (EnvironmentFile=/etc/learning-tool.env).
+- Manual EC2 setup → create /etc/learning-tool.env with key=value lines and load via systemd.
+- AWS SSM Parameter Store/Secrets Manager → store the secrets and fetch them during deploy to populate /etc/learning-tool.env.
+
+See docs/DEPLOYMENT.md for step-by-step examples and snippets.
 
 ## Development
 - Backend tests: `./gradlew test`

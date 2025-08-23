@@ -53,6 +53,17 @@ npm run build
 # Serve the dist/ directory with any static web server
 ```
 
+### Frontend UI
+- The app has three tabs in the header:
+  - Generate: form to POST /api/generate and view results (pretty and raw JSON).
+  - History: fetch and view items from /api/history.
+  - Admin: perform admin actions similar to Swagger:
+    - Insert sample (POST /api/history/sample)
+    - Insert custom history record (POST /api/history) with items and payload JSON
+    - Trigger generate (POST /api/generate)
+    - Fetch history (GET /api/history)
+- Configure API base via environment variable VITE_API_BASE (empty means same origin: the dev proxy or the server serving the SPA).
+
 ## Generate Content
 - Choose a type (Short Notes, Cheat Sheet, Image, Animation, LeetCode, Voice Explanation, Interview Q&A)
 - Enter a topic (e.g., "Java Streams")

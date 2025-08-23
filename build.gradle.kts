@@ -26,6 +26,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
+    // Swagger/OpenAPI UI
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0")
+
     // For reactive WebClient to call AI providers if desired
     implementation("org.springframework.boot:spring-boot-starter-webflux")
 
